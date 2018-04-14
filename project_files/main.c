@@ -33,9 +33,9 @@ static void ErrorToLeds(uint8_t err_type)
 	
 	for(i=0; i < err_type; i++)
 	{
-		delay_long(2);
+		delay_long(15);
 		GPIOB->ODR = OUT_ERR_LED;
-		delay_long(2);
+		delay_long(15);
 		GPIOB->ODR = 0x00;
 	}
 }
@@ -109,7 +109,7 @@ static void WriteNewCard(uint8_t * card_num)
 
 int main(void)
 {
-	char uart_buf[14] = { 0 };
+	char uart_buf[256] = { 0 };
 	uint8_t i = 0;
 	uint8_t master_mode = 0;
 	
@@ -122,6 +122,7 @@ int main(void)
 		uart_buf[i] = (char)USART_ReceiveData(USART2);
 		if(uart_buf[i++] == 0x03)
 		{
+			USART_Cmd(USART2,DISABLE);
 			if (master_mode)
 				WriteNewCard((uint8_t *)uart_buf + 1);
 			
@@ -130,10 +131,12 @@ int main(void)
 			if(CheckCardPresent((uint8_t *)uart_buf + 1) && (master_mode == 0))
 			{
 				GPIOB->ODR = OUT_MAG_LOCK;
-				delay_long(12);
+				delay_long(15);
 				GPIOB->ODR = 0;
 			}
 			i = 0;
+			delay_long(20);
+			USART_Cmd(USART2,ENABLE);
 		}
 	}
 }
