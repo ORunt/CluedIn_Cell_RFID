@@ -2,22 +2,31 @@
 #include <stdio.h>
 #include <string.h>
 
+//#define PROGRAMABLE_CARDS
+
 #define FLASH_PAGE_SIZE         ((uint32_t)0x00000400)   /* FLASH Page Size */
 #define FLASH_USER_START_ADDR   ((uint32_t)0x08006000)   /* Start @ of user Flash area */
 #define FLASH_USER_END_ADDR     ((uint32_t)0x08006400)   /* End @ of user Flash area */
 
-#define ERR_MASTER_CARD					0x01
+#define ERR_INVALID_CARD        0x01
 #define ERR_NO_SPACE						0x02
 #define ERR_NVM 								0x03
 
+#define SUCCESS_VALID_CARD      0x01
+#define SUCCESS_MASTER_CARD     0x02
+
 #define OUT_ERR_LED							0x0001
-#define OUT_MAG_LOCK						0x0002
+#define OUT_SUCCESS_LED         0x0002
+#define OUT_MAG_LOCK						0x0004
 
 void USART2_Init(void);
 void LEDS_init(void);
 
 const char card_master[] = "0000F4CEAB91";	// Card 1
 const char card_OG[]     = "01001158BCF4";	// Card 2
+//const char jason_access[]= "30780534D7AE";  
+
+const char * list_of_cards[] = {card_master, card_OG};
 
 static void delay_long(uint8_t len)
 {
@@ -27,18 +36,45 @@ static void delay_long(uint8_t len)
 		for(delay_counter_inside = 0; delay_counter_inside < 300000; delay_counter_inside++);
 }
 
-static void ErrorToLeds(uint8_t err_type)
+static void BlinkLed(uint8_t blink_num, uint8_t led)
 {
 	uint8_t i;
 	
-	for(i=0; i < err_type; i++)
+	for(i=0; i < blink_num; i++)
 	{
-		delay_long(15);
-		GPIOB->ODR = OUT_ERR_LED;
-		delay_long(15);
-		GPIOB->ODR = 0x00;
+    if (blink_num == 1)
+    {
+      GPIOB->ODR |= led;
+      delay_long(15);
+      GPIOB->ODR &= ~led;
+    }
+    else
+    {
+      delay_long(15);
+      GPIOB->ODR |= led;
+      delay_long(15);
+      GPIOB->ODR &= ~led;
+    }
 	}
 }
+
+#ifndef PROGRAMABLE_CARDS
+
+static uint8_t CheckCardPresent(uint8_t * card_num)
+{
+	uint8_t i;
+  uint8_t num_of_cards = sizeof(list_of_cards)/sizeof(char*);
+  
+  for(i = 0; i < num_of_cards; i++)
+  {
+    if (!memcmp(list_of_cards[i], card_num, 12))
+      return 1;
+  }
+
+	return 0;	// card not found
+}
+
+#else
 
 static uint8_t CheckCardPresent(uint8_t * card_num)
 {
@@ -60,7 +96,7 @@ static uint8_t CheckForMasterCard(uint8_t * card_num)
 {
 	if (!memcmp(card_master, card_num, 12))	// Check master card first
 	{
-		ErrorToLeds(ERR_MASTER_CARD);
+		BlinkLed(SUCCESS_MASTER_CARD, OUT_SUCCESS_LED);
 		return 1;	// Master Card found
 	}
 	return 0;
@@ -73,7 +109,7 @@ static uint32_t FindEmptySlot(void)
 	{
 		if (address > FLASH_USER_END_ADDR)
 		{
-			ErrorToLeds(ERR_NO_SPACE);
+			BlinkLed(ERR_NO_SPACE, OUT_ERR_LED);
 			return 0;
 		}
 		address += 12;
@@ -100,12 +136,14 @@ static void WriteNewCard(uint8_t * card_num)
 		}
 		else
 		{
-			ErrorToLeds(ERR_NVM);
+			BlinkLed(ERR_NVM, OUT_ERR_LED);
 			break;
 		}
 	}
 	FLASH_Lock();
 }
+
+#endif
 
 int main(void)
 {
@@ -123,23 +161,26 @@ int main(void)
 		if(uart_buf[i++] == 0x03)
 		{
 			USART_Cmd(USART2,DISABLE);
+      
+#ifdef PROGRAMABLE_CARDS
 			if (master_mode)
 				WriteNewCard((uint8_t *)uart_buf + 1);
 			
 			master_mode = CheckForMasterCard((uint8_t *)uart_buf + 1);
+#endif
 			
 			if(CheckCardPresent((uint8_t *)uart_buf + 1) && (master_mode == 0))
-			{
-				GPIOB->ODR = OUT_MAG_LOCK;
-				delay_long(15);
-				GPIOB->ODR = 0;
-			}
+        BlinkLed(SUCCESS_VALID_CARD, OUT_MAG_LOCK | OUT_SUCCESS_LED);
+      else
+        BlinkLed(ERR_INVALID_CARD, OUT_ERR_LED);
+      
 			i = 0;
 			delay_long(20);
 			USART_Cmd(USART2,ENABLE);
 		}
 	}
 }
+
 
 void LEDS_init(void)
 {
