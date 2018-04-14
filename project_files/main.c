@@ -44,16 +44,16 @@ static void BlinkLed(uint8_t blink_num, uint8_t led)
 	{
     if (blink_num == 1)
     {
-      GPIOB->ODR |= led;
+      GPIOA->ODR |= led;
       delay_long(15);
-      GPIOB->ODR &= ~led;
+      GPIOA->ODR &= ~led;
     }
     else
     {
       delay_long(15);
-      GPIOB->ODR |= led;
+      GPIOA->ODR |= led;
       delay_long(15);
-      GPIOB->ODR &= ~led;
+      GPIOA->ODR &= ~led;
     }
 	}
 }
@@ -184,9 +184,15 @@ int main(void)
 
 void LEDS_init(void)
 {
-	RCC->AHBENR |= 0x040000;	// This must be changed later on the actual puzzle
-	GPIOB->MODER = 0x5555;
-	GPIOB->ODR = 0x00;
+  GPIO_InitTypeDef GPIO_InitStructure = {0};
+
+  RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOA, ENABLE);
+  
+  GPIO_InitStructure.GPIO_Pin = OUT_ERR_LED | OUT_SUCCESS_LED | OUT_MAG_LOCK;
+  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
+  GPIO_Init(GPIOA, &GPIO_InitStructure);
+  
+  GPIOA->ODR &= ~(OUT_ERR_LED | OUT_SUCCESS_LED | OUT_MAG_LOCK); // Make sure these puppies are off
 }
 
 void USART2_Init(void)	//this uart uses pin PA2 = TX and PA3 = RX
@@ -198,11 +204,11 @@ void USART2_Init(void)	//this uart uses pin PA2 = TX and PA3 = RX
 
   RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART2,ENABLE);
 
-  GPIO_PinAFConfig(GPIOA, GPIO_PinSource2, GPIO_AF_1);
+  //GPIO_PinAFConfig(GPIOA, GPIO_PinSource2, GPIO_AF_1);
   GPIO_PinAFConfig(GPIOA, GPIO_PinSource3, GPIO_AF_1);
 
   //Configure USART2 pins:  Rx and Tx ----------------------------
-  GPIO_InitStructure.GPIO_Pin =  GPIO_Pin_2 | GPIO_Pin_3;
+  GPIO_InitStructure.GPIO_Pin =  GPIO_Pin_3;
   GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
   GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
   GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
@@ -214,7 +220,7 @@ void USART2_Init(void)	//this uart uses pin PA2 = TX and PA3 = RX
   USART_InitStructure.USART_StopBits = USART_StopBits_1;
   USART_InitStructure.USART_Parity = USART_Parity_No;
   USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
-  USART_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;
+  USART_InitStructure.USART_Mode = USART_Mode_Rx;
   USART_Init(USART2, &USART_InitStructure);
 
   USART_Cmd(USART2,ENABLE);
