@@ -56,8 +56,8 @@ static void BlinkLed(uint8_t blink_num, uint8_t led)
         GPIOA->ODR &= ~OUT_MAG_LOCK;
       delay_long(15);
       GPIOA->ODR &= ~led;
-      if (maglock_present)
-        GPIOA->ODR |= OUT_MAG_LOCK;
+      //if (maglock_present)
+      //  GPIOA->ODR |= OUT_MAG_LOCK;
     }
     else
     {
