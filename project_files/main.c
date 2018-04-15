@@ -19,7 +19,7 @@
 #define OUT_SUCCESS_LED         0x0002
 #define OUT_MAG_LOCK						0x0004
 
-void USART2_Init(void);
+void USART1_Init(void);
 void LEDS_init(void);
 
 const char card_master[] = "0000F4CEAB91";	// Card 1
@@ -39,14 +39,25 @@ static void delay_long(uint8_t len)
 static void BlinkLed(uint8_t blink_num, uint8_t led)
 {
 	uint8_t i;
+  uint8_t maglock_present = 0;
+  
+  if (led & OUT_MAG_LOCK)
+  {
+    led &= ~OUT_MAG_LOCK;
+    maglock_present = 1;
+  }
 	
 	for(i=0; i < blink_num; i++)
 	{
     if (blink_num == 1)
     {
       GPIOA->ODR |= led;
+      if (maglock_present)
+        GPIOA->ODR &= ~OUT_MAG_LOCK;
       delay_long(15);
       GPIOA->ODR &= ~led;
+      if (maglock_present)
+        GPIOA->ODR |= OUT_MAG_LOCK;
     }
     else
     {
@@ -152,15 +163,17 @@ int main(void)
 	uint8_t master_mode = 0;
 	
 	LEDS_init();
-	USART2_Init();
+	USART1_Init();
+  
+  GPIOA->ODR |= OUT_MAG_LOCK; // Must be normally powered
 
 	while (1)
 	{
-		while(USART_GetFlagStatus(USART2,USART_FLAG_RXNE) == RESET);
-		uart_buf[i] = (char)USART_ReceiveData(USART2);
+		while(USART_GetFlagStatus(USART1,USART_FLAG_RXNE) == RESET);
+		uart_buf[i] = (char)USART_ReceiveData(USART1);
 		if(uart_buf[i++] == 0x03)
 		{
-			USART_Cmd(USART2,DISABLE);
+			USART_Cmd(USART1,DISABLE);
       
 #ifdef PROGRAMABLE_CARDS
 			if (master_mode)
@@ -176,7 +189,7 @@ int main(void)
       
 			i = 0;
 			delay_long(20);
-			USART_Cmd(USART2,ENABLE);
+			USART_Cmd(USART1,ENABLE);
 		}
 	}
 }
@@ -195,19 +208,19 @@ void LEDS_init(void)
   GPIOA->ODR &= ~(OUT_ERR_LED | OUT_SUCCESS_LED | OUT_MAG_LOCK); // Make sure these puppies are off
 }
 
-void USART2_Init(void)	//this uart uses pin PA2 = TX and PA3 = RX
+void USART1_Init(void)	//this uart uses pin PA2 = TX and PA3 = RX
 {
 	USART_InitTypeDef USART_InitStructure;
   GPIO_InitTypeDef GPIO_InitStructure;
 
   RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOA, ENABLE);
 
-  RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART2,ENABLE);
+  RCC_APB2PeriphClockCmd(RCC_APB2Periph_USART1,ENABLE);
 
   //GPIO_PinAFConfig(GPIOA, GPIO_PinSource2, GPIO_AF_1);
   GPIO_PinAFConfig(GPIOA, GPIO_PinSource3, GPIO_AF_1);
 
-  //Configure USART2 pins:  Rx and Tx ----------------------------
+  //Configure USART1 pins:  Rx and Tx ----------------------------
   GPIO_InitStructure.GPIO_Pin =  GPIO_Pin_3;
   GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
   GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
@@ -221,8 +234,8 @@ void USART2_Init(void)	//this uart uses pin PA2 = TX and PA3 = RX
   USART_InitStructure.USART_Parity = USART_Parity_No;
   USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
   USART_InitStructure.USART_Mode = USART_Mode_Rx;
-  USART_Init(USART2, &USART_InitStructure);
+  USART_Init(USART1, &USART_InitStructure);
 
-  USART_Cmd(USART2,ENABLE);
+  USART_Cmd(USART1,ENABLE);
 }
 
